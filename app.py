@@ -20,7 +20,6 @@ st.divider()
 def load_data():
     df = pd.read_csv("data/expenses.csv")
     df['Date'] = pd.to_datetime(df['Date'])
-    df['Month'] = df['Date'].dt.strftime('%B %Y')
     return df
 
 df = load_data()
@@ -39,9 +38,16 @@ months = st.sidebar.multiselect(
     default=df['Month'].unique()
 )
 
+payment_modes = st.sidebar.multiselect(
+    "Select Payment Mode",
+    options=df['Payment_Mode'].unique(),
+    default=df['Payment_Mode'].unique()
+)
+
 filtered_df = df[
     (df['Category'].isin(categories)) &
-    (df['Month'].isin(months))
+    (df['Month'].isin(months)) &
+    (df['Payment_Mode'].isin(payment_modes))
 ]
 
 # KPI Cards
@@ -74,7 +80,11 @@ with col1:
 
 with col2:
     st.subheader("Monthly Spending Trend")
+    month_order = ['January', 'February', 'March', 'April', 'May', 'June',
+                   'July', 'August', 'September', 'October', 'November', 'December']
     month_data = filtered_df.groupby('Month')['Amount'].sum().reset_index()
+    month_data['Month'] = pd.Categorical(month_data['Month'], categories=month_order, ordered=True)
+    month_data = month_data.sort_values('Month')
     fig2 = px.bar(month_data, x='Month', y='Amount',
                   color='Amount', color_continuous_scale='Blues',
                   text='Amount')
@@ -85,17 +95,26 @@ with col2:
 col3, col4 = st.columns(2)
 
 with col3:
-    st.subheader("Category-wise Monthly Breakdown")
-    pivot = filtered_df.groupby(['Month', 'Category'])['Amount'].sum().reset_index()
-    fig3 = px.bar(pivot, x='Month', y='Amount', color='Category',
-                  barmode='group', color_discrete_sequence=px.colors.qualitative.Pastel)
+    st.subheader("Spending by Payment Mode")
+    pay_data = filtered_df.groupby('Payment_Mode')['Amount'].sum().reset_index()
+    fig3 = px.pie(pay_data, values='Amount', names='Payment_Mode',
+                  hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
+    fig3.update_traces(textposition='inside', textinfo='percent+label')
     st.plotly_chart(fig3, use_container_width=True)
 
 with col4:
-    st.subheader("Spending Over Time")
-    fig4 = px.line(filtered_df.sort_values('Date'), x='Date', y='Amount',
-                   color='Category', markers=True)
+    st.subheader("Category-wise Monthly Breakdown")
+    pivot = filtered_df.groupby(['Month', 'Category'])['Amount'].sum().reset_index()
+    fig4 = px.bar(pivot, x='Month', y='Amount', color='Category',
+                  barmode='group',
+                  color_discrete_sequence=px.colors.qualitative.Pastel)
     st.plotly_chart(fig4, use_container_width=True)
+
+# Charts Row 3
+st.subheader("Spending Over Time")
+fig5 = px.line(filtered_df.sort_values('Date'), x='Date', y='Amount',
+               color='Category', markers=True)
+st.plotly_chart(fig5, use_container_width=True)
 
 # Data Table
 st.subheader("Transaction Details")
